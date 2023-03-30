@@ -1,0 +1,625 @@
+---
+title: "Predicting Real Estate Prices: A Random Forest Approach"
+author: "Allen Wang"
+output: 
+  tufte::tufte_handout: default
+---
+
+
+
+```{r setup, include=FALSE,echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tufte)
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(tidyr)
+library(gridExtra)
+library(GGally)
+library(factoextra)
+library(randomForest)
+library(datasets)
+library(caret)
+library(caTools)
+library(factoextra)
+library(tidyverse)
+library(corrplot)
+library(ggfortify)
+library(wordcloud2) 
+```
+
+
+
+```{r,echo=FALSE}
+sales <- read.delim("/Users/allenwang/Downloads/Ames/ames_data.txt")
+```
+
+```{r,echo=FALSE}
+library("writexl")
+library(readxl)
+```
+
+
+```{r, include=FALSE}
+sales <- read_excel("sales.xlsx")
+p <- ggplot(sales)
+```
+
+```{r,echo=FALSE,warning=FALSE,fig.height=3,fig.width=4,fig.margin = TRUE, fig.cap = "Year Built vs. Overall Quality of Property: This graph compares the year that properties were built to the overall quality on a scale of 0.0 for the worst to 10.0 for the highest rating. It is interesting to see that most of the year ranges for property construction had a large spread while the newer construction mostly had high quality."}
+p + geom_boxplot(aes(x = Year.Built, y = as.factor(Overall.Qual), color=SalePrice)) + ggtitle("Overall Quality of Property vs. Year Property was Built") + xlab("Year Built") + ylab("Overall Quality")+ theme_bw()+ scale_color_gradientn(colours = rainbow(5))
+```
+
+```{r,echo=FALSE,warning=FALSE,fig.height=3,fig.width=4,fig.margin = TRUE, fig.cap = "Price/Sq Ft vs. Year Built: This graph compares the size of the living area of a property to the year it was built. This may be an indicator for consumer’s preferences as well as the size of their families. Over time there seems to be a general but subtle increase in the size of the homes built. In addition, it is interesting to note that due to some vertical line artifacts for some of the older homes, it seems that the home sale years were rounded to the nearest decade"}
+p + geom_point(aes(x = Year.Built, y = SalePrice/Gr.Liv.Area, color=Gr.Liv.Area), position = 'jitter') + ggtitle("Price per Square Foot vs Year Built") + xlab("Year Built") + ylab("Price/Sq Ft") + labs(color='Gr.Liv.Area') + theme_bw() + scale_color_gradientn(colours = rainbow(5)) + labs(color='Square Footage') + scale_y_continuous(trans='log10')
+```
+
+```{r, include = FALSE}
+sales_numeric <- sales %>% select_if(is.numeric)
+sales_numeric_c <- subset(sales_numeric, select = -c(PID, Order, SalePrice, Mo.Sold))
+sales_numeric_c <- sales_numeric_c[, colSums(is.na(sales_numeric_c)) == 0]
+```
+
+```{r, include = FALSE}
+sales_c <- sales[, colSums(is.na(sales)) == 0]
+```
+
+
+```{r,echo=FALSE}
+set.seed(1)
+in.train = sample(nrow(sales_c), size = round(nrow(sales_c) * .8))
+sales_train = sales_c[in.train, ]
+sales_test = sales_c[-in.train, ]
+```
+
+```{r, include=FALSE}
+sales.rf <- randomForest(sales_train)
+```
+
+```{r, include=FALSE}
+sales.rf
+```
+
+```{r, include=FALSE}
+salest_woprice <- subset(sales_train, select = -c(PID, Order, SalePrice, MS.SubClass, MS.Zoning, Mo.Sold))
+```
+
+```{r, include=FALSE}
+regression_RF = randomForest(x = salest_woprice,
+                             y = sales_train$SalePrice,
+                             ntree = 500)
+```
+
+
+```{r, include=FALSE}
+regression_RF
+```
+
+```{r, include=FALSE}
+y_pred = predict(regression_RF, newdata = sales_test)
+```
+
+```{r, echo=FALSE, fig.height=3,fig.width=4,fig.margin = TRUE, fig.cap = "This figure shows the performance of the random forest model used to determine the most important features going into the pricing of real estate. It seems that most of the error is reduced in the first 100-200 trees."}
+plot(regression_RF, main="Random Forest Performance")
+```
+
+# Executive Summary
+## Introduction
+For most Americans, their home is the most expensive thing that they will ever own. Each year, millions of homes are bought and sold as prospective homeowners make decisions about how much money they are willing to part with to acquire a property. Given the importance of such purchases, this underscores the utility of predicting the valuation of real estate depending on a variety of factors, including location, square footage, number of bedrooms, lot area, and others. In this project I will explore what considerations impact this decision. I will be analyzing a dataset collected from Ames, Iowa, which I will describe further in this report. First I will contextualize my analysis within the historical and socioeconomic context of Ames, delve into exploratory data analysis, then use various models to explore the implications of the data. Finally, I will offer recommendations to potential homebuyers as well as sellers as to how they might utilize the insights gained from the analysis.
+
+## Exploratory Data Analysis
+
+The exploratory data analysis has led to greater insight into the relationships between the different variables as well as with the dependent variable of price. Through multi-dimensional visualizations of these data, these highlight key observations that will assist in my modeling of the data. Among these include the importance of analyzing not just the sale price but also the sale price per square foot; the quality, size, and location as the apparent most important variables affecting sales price, as expected; and the overall shape and spread of the distribution of the data across different pairwise comparisons.
+
+## Modeling
+I used a random forest regression model, which is a learning method that simultaneously constructs a number of decision trees that returns the mean prediction of the individual trees. The presence of many trees prevents overfitting of the data to the training set. 
+
+
+```{r, include=FALSE}
+importance(regression_RF)
+```
+
+```{r, echo=FALSE, fig.height=6.5, fig.width=8}
+varImpPlot(regression_RF, main = "Feature Importance")
+```
+
+## Results
+From the results of the random forest classification, it seems that the five most important factors that go into the pricing of a home seem to be overall quality, square footage, age of the home, the size of the first floor, and the quality of the home exterior. Homeowners and homebuyers can extrapolate this information to determine the fair sales price of a home as well as assess which features to focus renovations on to increase the value of the property. It seems that the most important factor going into the valuation of a home is the year it was built. Regardless, it seems that the most important factors are overall quality, square footage, year built, the square footage of the first floor, exterior quality, kitchen quality, and lot area. 
+
+Homeowners can take these findings to determine which features to add to a house to increase its value. These solutions can include remodeling the kitchen and interior of the house as well as adding extensions to increase square footage. Similarly, homebuyers can use these analyses to determine whether homes are priced fairly and prevent information asymmetry, or transactions where one party has better information than the other. Such real estate education will increase the fairness and competitiveness of the housing market to make sure that houses are priced close to their real value. 
+
+
+# Introduction
+For most Americans, their home is the most expensive thing that they will ever own. Each year, millions of homes are bought and sold as prospective homeowners make decisions about how much money they are willing to part with to acquire a property. Given the importance of such purchases, this underscores the utility of predicting the valuation of real estate depending on a variety of factors, including location, square footage, number of bedrooms, lot area, and others. In this project I will explore what considerations impact this decision. I will be analyzing a dataset collected from Ames, Iowa, which I will describe further in this report. First I will contextualize my analysis within the historical and socioeconomic context of Ames, delve into exploratory data analysis, then use various models to explore the implications of the data. Finally, I will offer recommendations to potential homebuyers as well as sellers as to how they might utilize the insights gained from the analysis.
+
+# Data Collection
+This dataset was collected from the town of Ames, Iowa, which is the home of the Iowa State University as well as the ninth largest city in Iowa. Iowa State has approximately 35,000 students, which make up around half of Ames’ total population. This potential pool of homebuyers, specifically undergraduate and graduate students as well as professor, definitely impacts the characteristics of the real estate market of this locality. Besides Iowa State, Ames is also home to a US Department of Energy laboratory studying energy and the environment as well as the largest animal disease center in the country. The town is predominantly white, and the median age is 24 years old. The average family size is 2.82. These statistics will allow us to contextualize the analysis within the demographic and socioeconomic features of the town.
+
+# Data Set
+In this project, I will examine the relationship between the different features of real estate properties and how that can be used to predict its sale price. I used data from the Ames real estate data set for my project. There are 82 variables in the data set, including various physical and categorical features of house sales in Ames, Iowa. There are 23 nominal variables, 23 ordinal variables, 14 discrete variables, and 20 continuous variables in addition to 2 additional identifiers. The most important variable for my analysis is the sale price, as it is the main object of my exploration and is contingent on every other factor. Other important variables include the house type, square footage of the house, lot size, sale date, number of rooms, and location. I have included a data dictionary that explains the variables in the data set and the meanings of the values. This project will uncover insights as to the reasons behind pricing of real estate based on many variables through models that will try to predict the valuation of a house based on a multitude of factors. I am interested in exploring this particular data set as it highlights the various parameters that go into consumer's decision making and how much money people are willing to spend for different types of properties. This project differs from previous ones because it seeks to analyze this choice using a wide range of variables, including kitchen and garage quality, masonry veneer type, and garage finish. The feature richness of this particular dataset allows for a more complete understanding of consumer’s behavior. The three hypotheses that I look forward to exploring include the following: 1) How can we create a model that can be used to predict the sales price of properties using the wide range of variables? 2) What are the most important factors going into consumers’ decisions to purchase a home for a particular price, and conversely, what are some features that consumer’s are most willing to overlook defects in? 3) If a property owner would like to increase the price of their property, what features might they focus on in order to most efficiently and cheaply raise the value of their home? I look forward to utilizing various models to explore these various questions, including random forest and gradient boosting. 
+
+# Overview
+First I want to identify which variables to prioritize in my analysis as well as which other datasets I can compare these data to in order to illustrate my three hypotheses. Another item in this step is to identify other housing data sets that could be used to supplement these other data sets. Next I want to clean the data. This includes removing incomplete records, parts of the data that I do not intend to analyze, and other steps in order to make the data usable for analysis. After cleaning the data, I want to perform some exploratory data analysis, including identifying general trends for property valuations. In addition to this, I will create some graphs displaying the EDA. The next step is to identify which features to include and analyze as well as choose which predictive model to run on the data. The most important features I expect to go into a consumer’s decision are price, location, sale date, and size of house. Lastly, I want to create visualizations of the output of my data analysis and find strategies to communicate my findings. Some challenges that I might run into include missing variables, finding ways to represent a house’s location and its desirability, and preventing overfitting to this particular data set. I will address these problems by using ZCTA or neighborhood to represent location, cleaning the data effectively to remove incomplete variables, and cross validation or trimming features to prevent overfitting.
+
+\newpage
+
+# Exploratory Data Analysis
+
+```{r,echo=FALSE}
+sales <- read.delim("/Users/allenwang/Downloads/Ames/ames_data.txt")
+```
+
+```{r,echo=FALSE}
+library("writexl")
+library(readxl)
+```
+
+
+```{r, include=FALSE}
+sales <- read_excel("sales.xlsx")
+```
+
+
+```{r, include=FALSE}
+summary(sales)
+```
+
+```{r,echo=FALSE}
+p <- ggplot(sales)
+```
+
+
+```{r,echo=FALSE, fig.height =3, fig.width = 5}
+p + geom_boxplot(aes(x = Sale.Condition, y = SalePrice)) + ggtitle("Sale Price vs. Sale Condition") + xlab("Sale Condition") + ylab("Sale Price") + theme_bw() + scale_y_continuous(trans='log10') + scale_x_discrete(labels = c('Normal','Abnormal','Land', 'Two Linked Properties','Sale to Family', 'Partial Construction')) + theme(axis.text.x = element_text(angle = 45))
+```
+
+```{r,echo=FALSE, fig.height =3, fig.width=5}
+p + geom_boxplot(aes(x = Sale.Condition, y = SalePrice/Gr.Liv.Area)) + ggtitle("Sale Price/Sq Ft. vs. Sale Condition") + xlab("Sale Condition") + ylab("Sale Price/Sq Ft") + theme_bw() + scale_y_continuous(trans='log10') + scale_x_discrete(labels = c('Normal','Abnormal','Land', 'Two Linked Properties','Sale to Family', 'Partial Construction')) + theme(axis.text.x = element_text(angle = 45))
+```
+
+<p>&nbsp;</p>
+Sale Price vs. Sale Condition: These graphs compare the sales price to sales condition, and I noticed peaks at normal and abnormal conditions, probably due to properties in poor condition being sold to developers for the location/land, interesting to look at spread/general location of data points for each sales condition. I transformed the y-axis to be on a log10 scale to improve readibility.
+
+\newpage
+
+```{r,echo=FALSE}
+p + geom_bar(aes(x = Bldg.Type)) + ggtitle("Building Types") + theme_bw() + xlab("Building Type") + ylab("Number of Houses") + scale_x_discrete(labels = c('Single Family','Two Family Converted','Duplex', 'Townhouse (End)','Townhouse (Inside)')) + theme(axis.text.x = element_text(angle = 90))
+```
+
+<p>&nbsp;</p>
+Building Types: This graph compares the counts of different building types. Most of the properties in the data set were single family homes and a distant second was townhouses. The comparison highlights the different needs of the consumers.
+<p>&nbsp;</p>
+
+```{r, echo=FALSE}
+p + geom_boxplot(aes(x = as.factor(Yr.Sold), y = SalePrice)) + ggtitle("Sale Price by Year") + xlab("Year Sold") + ylab("Sale Price")+ theme_bw()+ scale_color_gradientn(colours = rainbow(5))
+```
+<p>&nbsp;</p>
+Price by Year: It seems that there isn't a huge decrease in prices around the 2008 crash. This might be because most of the town's economy is tied to the university, which seems to be largely independent of overall economic conditions, so demand for housing remains largely constant.
+
+
+```{r,echo=FALSE}
+p + geom_boxplot(aes(x = Year.Built, y = as.factor(Overall.Qual), color=SalePrice)) + ggtitle("Overall Quality of Property vs. Year Property was Built") + xlab("Year Built") + ylab("Overall Quality")+ theme_bw()+ scale_color_gradientn(colours = rainbow(5))
+```
+<p>&nbsp;</p>
+```{r,echo=FALSE}
+p + geom_violin(aes(x = Year.Built, y = as.factor(Overall.Qual), color=SalePrice)) + ggtitle("Overall Quality of Property vs. Year Property was Built") + xlab("Year Built") + ylab("Overall Quality")+ theme_bw()+ scale_color_gradientn(colours = rainbow(5))
+```
+<p>&nbsp;</p>
+Year Built vs. Overall Quality of Property: This graph compares the year that properties were built to the overall quality on a scale of 0.0 for the worst to 10.0 for the highest rating. It is interesting to see that most of the year ranges for property construction had a large spread while the newer construction mostly had high quality.
+
+```{r,echo=FALSE}
+p + geom_point(aes(x = Year.Built, y = Gr.Liv.Area, color=SalePrice/Gr.Liv.Area), position = 'jitter') + ggtitle("Living Area vs. Year Built") + xlab("Year Built") + ylab("Living Area") + labs(color='Sale Price/Sq Ft') + theme_bw() + scale_color_gradientn(colours = rainbow(5)) + scale_y_continuous(trans='log10')
+```
+<p>&nbsp;</p>
+```{r,echo=FALSE}
+p + geom_point(aes(x = Year.Built, y = SalePrice/Gr.Liv.Area, color=Gr.Liv.Area), position = 'jitter') + ggtitle("Price per Square Foot vs. Year Built") + xlab("Year Built") + ylab("Price/Sq Ft") + labs(color='Gr.Liv.Area') + theme_bw() + scale_color_gradientn(colours = rainbow(5)) + labs(color='Square Footage') + scale_y_continuous(trans='log10')
+```
+<p>&nbsp;</p>
+
+Living Area vs. Year Built: This graph compares the size of the living area of a property to the year it was built, which may be an indicator for consumer’s preferences as well as the size of their families. Over time there seems to be a general but subtle increase in the size of the homes built. In addition, it is interesting to note that due to some vertical line artifacts for some of the older homes, it seems that the home sale years were rounded to the nearest decade. 
+
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+p + geom_histogram(aes(x = SalePrice)) + ggtitle("Sale Price When Sold") + xlab("Sale Price") + theme_bw()
+```
+<p>&nbsp;</p>
+
+Sale Price: This is a histogram of all the sale prices. It is interesting to note the spread and shape of the distribution of prices of homes in Ames. Most homes are in the $100-200k range. The comparison between the first graph with a linear y-axis and the second graph with a log-10 scale is remarkable because of the shapes of the distributions. The first seems to be more skewed, ad the second one is mostly normal and thus better able to to show the presence of outliers.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+p + geom_histogram(aes(x = SalePrice/Gr.Liv.Area)) + ggtitle("Sale Price per Square Foot When Sold") + xlab("Sale Price/Sq Ft") + theme_bw()
+```
+<p>&nbsp;</p>
+
+Sale Price per Square Foot: The distribution of sale price per square foot has an interesting distribution. It is interesting to compare this graph to the previous one to reduce the influence of square footage on house price in our analysis. This is because this adjustment allows us to better analyze the desirability of the qualitative elements of the house such as location and features on buyers' considerations, independent of how much house people are able to purchase.
+
+```{r,echo=FALSE}
+p + geom_boxplot(aes(x = Neighborhood, y = SalePrice)) + ggtitle("Sale Price by Neighborhood") + xlab("Neighborhood") + ylab("Sales Price") + theme_bw() + theme(axis.text.x = element_text(angle = 90)) + scale_y_continuous(trans='log10')
+```
+
+<p>&nbsp;</p>
+Neighborhood Sales Prices: This graph compares the distributions of sales prices by neigborhoods. It is interesting to see which neighborhoods are broadly more expensive as well as how the size of the homes affects its price within the neigborhood. Also, the log scale allows better visualization of the spread of prices
+
+```{r,echo=FALSE}
+p + geom_boxplot(aes(x = Neighborhood, y = SalePrice/Gr.Liv.Area)) + ggtitle("Sale Price/Sq Ft by Neighborhood") + xlab("Neighborhood") + ylab("Price/Sq Ft") + theme_bw() + theme(axis.text.x = element_text(angle = 90)) + scale_y_continuous(trans='log10')
+```
+<p>&nbsp;</p>
+Neighborhood Sales Price/Square Foot: Analyzing the sales price by square foot allows for better analysis of the desirability of certain neighborhoods or locations while accounting for differences in house size.
+
+
+
+
+```{r,echo=FALSE}
+p + geom_boxplot(aes(x = as.factor(Bedroom.AbvGr), y = Gr.Liv.Area)) + ggtitle("Living Area vs. Bedrooms") + xlab("Bedrooms") + ylab("Living Area") + theme_bw() + scale_y_continuous(trans='log10')
+```
+<p>&nbsp;</p>
+Living Area vs. Bedrooms: This graph compares size of the house compared to the number of bedrooms within it. It is interesting to note the patterns in the data, especially that there is a general trend that the more living area a house has, the more bedrooms are present within it. The size of rooms within a house seems to be more or less standardized across most homes in Ames, especially within the lower ranges.
+
+
+```{r,echo=FALSE}
+p + geom_boxplot(aes(x = as.factor(Bedroom.AbvGr), y = Lot.Area)) + ggtitle("# Bedrooms vs Lot Area") + xlab("# Bedrooms") + ylab("Lot Area") + theme_bw() + scale_y_continuous(trans='log10')
+```
+<p>&nbsp;</p>
+Lot Area vs. Bedrooms: This graph analyzes the number of bedrooms in a house compared with the lot area. The shape of the distribution suggests that the number of bedrooms in a house seems to have less of a correlation with how large the lot area is than expected.
+
+# Exploratory Data Analysis Insights
+The exploratory data analysis provided important insights into next steps for my exploration of this data set. By delving into the relationships between the different physical features of the properties of the dataset, it was possible to articulate next steps for my analysis. Among these insights is the presence of outliers that might affect my analysis — they are unusually large houses sold around the market rate per square foot as well as unique partial sales. Also, there are missing data that would have to be addressed prior to modeling. In addition, it is possible to notice variables that are closely tied together, such as condition of house and the age of the property. This allows me to identify which features to include in my model to reduce collinearity. Through consideration of these new observations, I can better decide future course of action. Looking at the EDA, the ideal models for these data are random forest and gradient boosting. Some new questions that arise include the following: What are some ways to better transform the data to be better represented through graphs? How might I use the neighborhood variable to form a ranking of neighborhood desirability? How might this affect the types of data, such as neighborhood becoming an ordinal variable rather than a qualitative one?
+
+  
+# Model Choice Insights
+Current rising insights include examining the relationships between various variables in the dataset using visualization to form tentative conclusions as well as exploring which models and features to examine in greater detail. Some key observations include the relationships between the types of home and their sales prices as well as the three-way relationships between variables such as lot area and number of bedrooms with their sales prices. These uncovered relationships, as displayed by the EDA graphs, has informed my exploration of which ML models that can best unlock greater insights. Through the analyses uncovered by my EDA, it seems that the best model to determine which features of a house are most critical to determine the sales price is a random forest regression model. A random forest regression model is a supervised machine learning model that creates a series of decision trees on subsets of the data and takes the mean of each prediction to improve overall accuracy. The more trees are created, the higher the accuracy tends to be. After the regression analysis, I can then utilize the importance function to determine which factors affected the sales price prediction the most. This information can be utilized to create recommendations for potential homebuyers.
+
+# Conditioning on certain variables
+My analysis will lead to potential solutions for homeowners hoping to increase the sales prices of their homes, whether by remodeling or adding extensions to their houses. Through informing potential home buyers and sellers about what factors are most important for prescribing a value of a home, this raises transparency and literacy into the real estate market. The audience is not just limited to current participants in the real estate market, but also the general public, who would definitely appreciate learning about the market. This is because buying a house is something that most people aspire to or already have done. However, due to discrepancies in access to certain services, such as home surveyors, which can be inordinately expensive, it is important to provide recommendations that are available to people of different financial circumstances. Thus, I have decided to run the random forest regression analysis with the subjective factors removed, such as the variables with "quality" in them. Another consideration that has arisen from the interpretation of the EDA is focusing on the price per square foot and conditioning on the area of the house. Since there are large houses with poor quality that might fetch large sums of money, this necessitates analysis of the price per square foot as a better proxy for the true value/quality of a house. Thus, I will also run the random forest regression with the variables with "area" removed in order to better assess which factors are truly important. These three analyses will lead to a better understanding of which aspects are most beneficial to homebuyers' rationalization of how much to offer. 
+
+<p>&nbsp;</p>
+```{r, include = FALSE}
+sales_numeric <- sales %>% select_if(is.numeric)
+sales_numeric_c <- subset(sales_numeric, select = -c(PID, Order, SalePrice, Mo.Sold))
+sales_numeric_c <- sales_numeric_c[, colSums(is.na(sales_numeric_c)) == 0]
+```
+
+# Correlation Plot
+
+```{r, echo=FALSE, fig.height=8, fig.width=8}
+M = cor(sales_numeric_c, use="pairwise.complete.obs")
+corrplot(M, method = 'color', order = 'alphabet')
+```
+
+It is interesting to note the correlations between variables in the dataset. Some obvious correlations are rooms above ground and total living area as well as bedrooms above ground. It is also interesting to spot other patterns, such as how 2nd floor area is correlated with the number of half baths.
+
+# Principal Component Analysis
+Principal Component Analysis (PCA) is used to determine which variables have the greatest effect on the dependent variable, which is sale price when sold f or my particular dataset. First, I converted all the categorical variables into factors in order to allow me to perform this analysis. Next I will run the PCA and visualize the findings. This will allow me to determine the power or significance of the variables on the outcomes of my models.
+
+
+
+```{r, include=FALSE}
+summary(sales_numeric_c)
+```
+
+```{r, echo = FALSE}
+pc1<-prcomp(sales_numeric_c, center=TRUE, scale.=TRUE)
+```
+
+```{r, echo = FALSE, warning=FALSE, message=FALSE}
+pca_res <- prcomp(sales_numeric_c, scale. = TRUE)
+autoplot(pca_res, data = sales, colour = 'SalePrice', loadings.label.repel=T, loadings = TRUE, loadings.label=TRUE)
+```
+<p>&nbsp;</p>
+## Autoplot
+The autoplot graphs the first two principal components against the variable of sale price. As one can see from the visualization, the first two principal components explain a significant amount of the variation in the sale price of the homes. I have plotted the sale price using the color feature — note the sales price tend to increase from left to right along the horizontal axis. 
+<p>&nbsp;</p>
+
+
+```{r, echo = FALSE, fig.height=4}
+screeplot(pc1,type="lines", main="Scree Plot")
+# Select 1-5
+```
+<p>&nbsp;</p>
+
+## Scree Plot
+This scree plot displays the relative importance of the 10 most important principal components in the dataset. Since the scree, or the "elbow," of the graph seems to level off around 4-5 components, it seems that the first four features account for the majority of the variance in the dataset. I have graphed them against each other below.
+<p>&nbsp;</p>
+
+
+```{r, echo = FALSE, cex = 0.5}
+plot(pc1$x[,1],pc1$x[,2])
+plot(pc1$x[,1],pc1$x[,3])
+plot(pc1$x[,1],pc1$x[,4])
+plot(pc1$x[,2],pc1$x[,3])
+plot(pc1$x[,2],pc1$x[,4])
+plot(pc1$x[,3],pc1$x[,4])
+```
+
+## Graphing main principal components against each other
+It is interesting to note the relationships between the various principal components in the analysis through looking at the distributions and the scales. There seems to be an interesting relationship between the fourth principal component and the others, as the data is split into two distinct clusters — one wider one at the top and one smaller cluster at the bottom. Possible explanations for this include different house types, such as single family homes versus other types of buildings, and varying house qualities, given that rental properties to college students might deteriorate quicker than those occupied by families. 
+
+
+```{r, include = FALSE}
+sales_c <- sales[, colSums(is.na(sales)) == 0]
+```
+
+```{r, include=FALSE}
+head(sales_c)
+```
+```{r, include = FALSE}
+summary(sales_c)
+```
+
+
+
+```{r, include=FALSE}
+sales_nonnum <- sales %>% select_if(negate(is.numeric))
+```
+
+```{r, include=FALSE}
+head(sales_nonnum)
+```
+
+
+# K Means Analysis
+
+I used k-means clustering analysis to determine whether the data were aggregated together and if so, how many partitions the data were clustered into. For my dataset, I was interested in determining whether the houses in Ames were divided into clusters with high similarity, particularly whether university-affiliated housing was clustered distinct from non-university-affiliated housing, as this distinction might have a significant impact on potential homebuyers' perceptions.
+
+```{r, include = FALSE}
+sales_k <- kmeans(pc1$x, 4, iter.max = 10, nstart = 1)
+```
+
+
+```{r, include=FALSE}
+sales_k
+```
+
+
+```{r, echo=FALSE}
+fviz_nbclust(pc1$x, kmeans, method = "silhouette")
+```
+
+## Optimum Clusters
+This graph of number of clusters to average silhouette width is utilized to determine the optimum number of clusters for the k-means analysis. Silhouette width is a measure of how similar houses within each cluster are similar to other houses within that cluster. It seems that from this analysis, the optimum is four clusters for the maximum silhouette width.
+<p>&nbsp;</p>
+```{r, echo=FALSE}
+set.seed(1)
+autoplot(sales_k, data = pc1$x, main = "K-Means Clusters")
+```
+
+Groups 1 and 4 seem to be well separated while groups 2 and 3 seem to have overlap, meaning that the k-means analysis is not that well separated. Furthermore, the green (group 2) points seem to be determined by another principal component.
+
+<p>&nbsp;</p>
+```{r, echo=FALSE, fig.height=8, fig.width=8}
+fviz_cluster(sales_k, data = sales_numeric_c)
+```
+
+
+
+## Cluster plot
+I graphed the two clusters, and from observation, it seems that the data are not in fact divided into distinct clusters, as there is significant overlap between all four clusters. This means that the houses in the dataset must have broadly similar characteristics and are not divided into four very distinct clusters. There seems to be no clear cut pattern to this clustering.
+
+
+# Causal Perspectives
+Trying to analyze the different effects that various features of a house have on its valuation allows us to analyze and interpret the causal relationships between those variables. For example, perhaps a homeowner would like to raise the valuation of their home. While it is nearly impossible for them to change the location of the house, it is reasonable for them to use interventions such a remodeling to cause potential homebuyers to ascribe greater value to their property. This raises the question of which types of such interventions would be most effective and efficient in raising the sale price of the house as compared to its feasibility, particularly with finances. To address this question, it is critical to assess the confounding nature of certain variables in the dataset. 
+
+For example, one variable of interest is whether the house has a pool or not, which is encoded in the pool area variable. While one hypothesis for the relationship between the presence of pools and the final sale price of homes would be that homebuyers attach a premium to the presence of pools and thus value a house with a pool higher than the exact same house without a pool, it is also important to consider the possibility of this relationship being confounded by the neighborhood or location variable. One explanation for the correlation between sale price and pool size could be that lower-income, less desirable areas have higher density of residents due to smaller property size. This led to a higher number of public pools in those areas. Due to the presence of those public pools, new homes built in those areas are less likely to include pools, whereas in higher income areas with few or no community pools, construction companies were more likely to build pools in new houses. The presence of a pool in a property, represented through the “pool size” variable, is not intrinsically tied to greater valuation because of the confounding variable of neighborhood. Furthermore, the model's predictions could even codify previous bias in the home sales price as reflected by demographic information such as race. The endogenous variables raise the necessity of instrumental variables to a proper analysis.
+
+It is also interesting to consider another case of alternate explanations for the effect of a house’s size on its valuation. While it is traditionally assumed that a house with more square footage will be more expensive than a house of equivalent quality that is smaller, it is also possible to explain the correlation between size and price through the confounding variable of location. Houses in more desirable locations tend to have larger sizes because wealthy individuals want to have larger houses while less expensive neighborhoods can tend to have smaller plots of land and thus smaller houses. The price differentials can thus be explained through the location of the larger houses being in better neighborhoods rather than intrinsically tied to the size of the house.
+
+In order to assess the question of the true causal relationships between the variables, it is important to adjust the analyses to account for these hidden relationships. One example is using exogenous variables to overcome these relationships.
+
+# Ethical Implications
+We analyzed two texts for class: a toolkit for centering racial equity throughout data integration and AI blind spot. Through discussions of the ethical implications for our projects with my partner Jill, we were able to come up with a few key insights that will inform our discussion for the future steps. The first ethical dilemma that I formulated was the issue of information asymmetry in the real estate market. Realtors have access to significant information that most homebuyers do not have access to, which can lead to exploitation of less informed buyers. This highlights the necessity to address that power imbalance in this transaction, particularly through publicizing the findings and recommendations of this report. Through this balancing of the information asymmetry, we can achieve greater fairness and competitiveness in the housing market. 
+
+Another ethical implication present in my report is whether my dataset, which includes real estate transactions from a small town in Iowa from a small number of years, is representative of the housing market. I would say that the data collection method, which was from the municipal government, was largely unbiased, but the representativeness of the dataset might be impacted by the demographics of the town, which is largely white and college-educated. To overcome this discrepancy, it is important to stress that any conclusions drawn from this project are impacted by the characteristics of the town. This idea works in tandem with the idea of generalization error, where there might be shifts in the housing market since 2010 that were not accounted for in my analysis. To tackle this challenge, I will utilize demographic data to identify shifts in trends as well as use a manual review process to analyze whether my predictions align with my expectations. 
+
+
+# Random Forest
+## Train-Test Split
+In order to run models on the data,  I decided to split the data between 80% training and 20% testing sets.
+
+## Random Forest Regression on Overall Dataset
+```{r,echo=FALSE}
+set.seed(1)
+in.train = sample(nrow(sales_c), size = round(nrow(sales_c) * .8))
+sales_train = sales_c[in.train, ]
+sales_test = sales_c[-in.train, ]
+```
+
+```{r, include=FALSE}
+sales.rf <- randomForest(sales_train)
+```
+
+```{r, include=FALSE}
+sales.rf
+```
+
+```{r, include=FALSE}
+salest_woprice <- subset(sales_train, select = -c(PID, Order, SalePrice, MS.SubClass, MS.Zoning, Mo.Sold))
+```
+
+```{r, include=FALSE}
+regression_RF = randomForest(x = salest_woprice,
+                             y = sales_train$SalePrice,
+                             ntree = 500)
+```
+
+
+```{r, include=FALSE}
+regression_RF
+```
+
+```{r, include=FALSE}
+y_pred = predict(regression_RF, newdata = sales_test)
+```
+
+```{r, include=FALSE}
+importance(regression_RF)
+```
+
+```{r, include=FALSE}
+rfImportance <- importance(regression_RF)
+```
+
+
+```{r, echo=FALSE, fig.height=8, fig.width=8}
+varImpPlot(regression_RF, main="Feature Importance")
+```
+
+```{r, include=FALSE}
+head(rfImportance)
+```
+
+
+
+## Analysis - Random Forest Regression on Overall Dataset 
+From this regression random forest with 500 trees, the mean of the squared residuals was 682789397 and the variation explained was 89.43%. It seems that the most important factors that go into a home's pricing is its overall quality, the home's square footage, the age of the home, the area of the first floor, and the quality of the exterior and kitchen. These 6 variables have the highest decrease in node impurities. These observations are in line with my expectations. However, many of these features, such as quality, are subjective, in order for these data to be useful to potential homebuyers without access to expensive surveying services, we must rerun the analysis to look at objective data only.
+
+
+
+## Random Forest Regression with subjective factors removed
+```{r, include=FALSE}
+salest_wosubj <- subset(salest_woprice, select = -c(Condition.1, Condition.2, Overall.Qual, Overall.Cond, Exter.Qual, Exter.Cond, Kitchen.Qual))
+```
+
+I decided to remove the subjective factors and re-run the random forest classification. This is because to potential homeowners without access to expensive property assessor services, it is important to provide recommendations based solely on non-subjective characteristics of the house. Thus, I removed the variables related to "condition" and "quality."
+<p>&nbsp;</p>
+```{r, include=FALSE}
+regression_RF_w = randomForest(x = salest_wosubj,
+                             y = sales_train$SalePrice,
+                             ntree = 500)
+```
+
+
+```{r, include=FALSE}
+regression_RF_w
+```
+
+
+
+```{r, include=FALSE}
+y_pred = predict(regression_RF_w, newdata = sales_test)
+```
+
+```{r, include=FALSE}
+importance(regression_RF_w)
+```
+
+```{r, echo=FALSE, fig.height=8, fig.width=8}
+varImpPlot(regression_RF_w, main="Non-Subjective Feature Importance")
+```
+
+## Analysis - Random Forest Regression with subjective factors removed
+This random forest regression model with subjective factors removed and 500 trees again had a mean of squared residuals of 756108368 and variation explained at 88.3%. This means that the model performed slightly worse than when the subjective factors were kept. The most important features in this analysis were the greater living area, year built, first floor area, year remodeled/added, number of full bathrooms, and second floor area. These factors were largely in the same order as before with the exception of the ones that were removed. Given the high importance of living area, I decided to remove that factor from consideration to determine the factors affecting the price per square foot.
+
+
+## Random Forest Regression with subjective factors removed and conditioning on living area
+I decided to condition on living area and re-run the random forest classification. This is because sales price per square foot seems to be a more representative determinant of the value of a home independent of its area. I thus removed the factors of greater living area, lot area, first floor area, and second floor area.
+<p>&nbsp;</p>
+```{r, include=FALSE}
+salest_woarea <- subset(salest_wosubj, select = -c(Gr.Liv.Area,Lot.Area,X1st.Flr.SF,X2nd.Flr.SF))
+```
+
+```{r, include=FALSE}
+regression_RF_wa = randomForest(x = salest_woarea,
+                             y = sales_train$SalePrice/sales_train$Gr.Liv.Area,
+                             ntree = 500)
+```
+
+```{r, include=FALSE}
+regression_RF_wa
+```
+
+
+```{r, include=FALSE}
+y_pred = predict(regression_RF_wa, newdata = sales_test)
+```
+
+
+```{r, include=FALSE}
+importance(regression_RF_wa)
+```
+
+```{r, echo=FALSE, fig.height=8, fig.width=8}
+varImpPlot(regression_RF_wa, main="Non-Subjective Feature Importance for Price/Sq Ft")
+```
+
+## Analysis - Random Forest Regression with subjective factors removed and conditioning on living area
+The random forest regression with 500 trees had a mean of squared residuals of 293.2742 and variation explained at 71.36%. This means that the model performed slightly worse than the other two. This time, the most important factors were the year built, the year remodeled, the house style, number of rooms, number of bedrooms, and neighborhood.
+
+\newpage
+
+# Conclusions
+## Random Forest
+From the three random forest models, we see that each time I ran the analysis, there were slightly different factors that turned out to be the most important. In the overall model, the most important factors seemed to be related to the age of the house, quality of its features, and the size. The other two models adjusted the regression random forest model to account for the latter two overall factors. Throughout all three, it seems that the age of the house and whether it was remodeled emerged as the most important factors. This is probably because age of the house is correlated with the quality of the house. Since Ames is a college town and many of the properties are leased to college students, the deterioration of housing stock with time seems to be accelerated as reflected in how year built accounts for a lot of variance in the regression model.
+
+## Comparison between models
+The three random forest models I ran seemed to have different performance levels. The first one on the overall dataset had a variation explained of 89.43% while the second one with the subjective features removed had a similar variation of 88.3%. However, the final model had a lower variation explained of 71.36%. This might be because a significant percent of the variation in the sales price was determined by the size of the house, which makes sense. It is also interesting to note that the final model also had a significantly lower mean of squared residuals of around 300, compared to around 700 million for the first and 750 million for the second. This means that the final model had a better fitted model. These considerations inform our analysis of the most important features of a house towards its valuation.
+
+
+## Implications
+It seems that the most important factor going into the valuation of a home is the year it was built. However year built is also related to the quality of a home, which was the most important factor when I ran the random forest the first time. Regardless, it seems that the most important factors are overall quality, square footage, year built, the square footage of the first floor, exterior quality, kitchen quality, and lot area. When adjusted for size and subjectivity, the most important factors affecting price per square foot are year built, the year remodeled, the house style, number of rooms, number of bedrooms, and neighborhood. This is in line with my hypothesis, where I expected those factors to be the most important. However, I was surprised that location, through the neighborhood factor, did not play a large part in a homes' valuations. One explanation for this is that Ames' neighborhoods are largely homogeneous and thus there are not large discrepancies between the values of homes in certain neighborhoods, which we saw in the exploratory data analysis. According to demographic data, the population in Ames is largely affiliated with the university and thus there are not huge socioeconomic gaps between its residents.
+
+Homeowners can take these findings to determine which features to add to a house to increase its value. These can include remodeling the kitchen and interior of the house as well as adding extensions to increase square footage. Similarly, homebuyers can use these analyses to determine whether homes are priced fairly and prevent information asymmetry, or transactions where one party has better information than the other. This will increase the fairness and competitiveness of the housing market to make sure that houses are priced close to their real value. 
+
+## Next Steps
+In this report, I have analyzed the most important factors going into the valuation of homes using a random forest regression model. I have identified some potential new areas for exploration for greater insight into the real estate market. First, analyzing other datasets from other locations or even finding aggregate data from multiple locaitons can allow me to compare findings with the Ames dataset. Given the demographic and socioeconomic character of the town of Ames, Iowa, analyzing other areas, such as large cities and other small towns, can lead to assessment of the universality of the most important home-buying considerations determined in this analysis. Similarly, running other machine learning algorithms on Ames dataset can reveal profound findings that can lead to determining whether the results from the random forest regression are representative. In addition, time is another consideration that can be explored, as this dataset was from a small period of time of just five years. Over long periods, such as decades, consumers' preferences might have changed over time, especially with innovations such as household appliances and access to clean water. I can also explore datasets from areas outside the United States to determine whether cultural expectations play a role in how global homebuyers value potential houses to buy. These future steps of exploration can lend greater clarity and nuance into my analysis of the real estate market.
+
+\newpage
+
+# Appendix
+
+## Random Forest Performance
+
+Here I have included three graphs displaying the performance of the random forest models. It seems that all three models — on the overall dataset, with subjective features removed, and with conditioning on square footage — performed similarly. I ran my models with 500 trees, and the graphs show that most of the error becomes largely constant around 200 trees.
+<p>&nbsp;</p>
+```{r, echo=FALSE, cex=0.5, fig.height = 4, fig.width=8}
+plot(regression_RF, main="Random Forest Performance")
+```
+<p>&nbsp;</p>
+
+```{r, echo=FALSE, cex=0.5, fig.height = 4, fig.width=8}
+plot(regression_RF_w, main="Non-Subjective Features Random Forest Performance")
+```
+
+<p>&nbsp;</p>
+```{r, echo=FALSE, cex=0.5, fig.height = 4, fig.width=8}
+plot(regression_RF_wa, main="Non-Subjective Feature Importance Random Forest Performance for Price/Sq Ft")
+```
+\newpage
+
+## References
+* Boehmke, Bradley. "UC Business Analytics R Programming Guide: Random Forests", https://uc-r.github.io/random_forests
+* Chillakuru, Yeshwant et al. "Using Neighborhood Level Data to Predict the Residential Sale Price of Properties in Ames, Iowa," https://rstudio-pubs-static.s3.amazonaws.com/272593_00298de76d3048cd942b7fe5e8feb4a3.html
+* Dornel, Benjamin. "Predicting Housing Prices with Linear Regression," https://www.benjamindornel.com/ames-regression.html
+* Gabr, Gamal. "Ames Simplified," https://rstudio-pubs-static.s3.amazonaws.com/795734_679f51406f9a464bb18957f728e36387.html
+* Gangat, Maliha. "Predictive Data Model on Ames Housing Data," https://medium.com/analytics-vidhya/predictive-data-model-on-ames-housing-data-c45a84f6c4ac
+* Jana, Anup Kumar. "AMES Housing Price Project Solution," http://rstudio-pubs-static.s3.amazonaws.com/411830_faa32213605444738e864319dcc5d25e.html
+* Kuhn, Max and Julia Silge. "Tidy Modeling with R: The Ames Housing Data," https://www.tmwr.org/ames.html
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
